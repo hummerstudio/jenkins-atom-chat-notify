@@ -215,9 +215,11 @@ public class ChatNotifyAtom implements AtomTask {
 
     /** Tokens in the query string must not reach the console. */
     static String redact(URI uri) {
+        String base = uri.getScheme() + "://" + uri.getHost()
+                + (uri.getPort() > 0 ? ":" + uri.getPort() : "") + uri.getPath();
         String query = uri.getQuery();
         if (query == null || query.isEmpty()) {
-            return uri.getScheme() + "://" + uri.getHost() + uri.getPath();
+            return base;
         }
         StringBuilder masked = new StringBuilder();
         for (String pair : query.split("&")) {
@@ -227,7 +229,7 @@ public class ChatNotifyAtom implements AtomTask {
             }
             masked.append(key).append("=***");
         }
-        return uri.getScheme() + "://" + uri.getHost() + uri.getPath() + "?" + masked;
+        return base + "?" + masked;
     }
 
     private static String excerpt(String body) {

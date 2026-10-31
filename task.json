@@ -1,7 +1,7 @@
 {
   "atomCode": "chat-notify",
   "name": "Chat notification",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Posts one message to Slack, Teams, Google Chat, DingTalk, WeCom, Discord, Mattermost or Rocket.Chat.",
   "execution": {
     "packagePath": "chat-notify.jar",
