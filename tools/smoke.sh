@@ -28,6 +28,18 @@ last_body | grep -q '"text":"build 42 ok"' || fail "slack envelope: $(last_body)
 dir=$(post "{\"provider\": \"teams\", \"webhookUrl\": \"http://127.0.0.1:$port/hook\", \"text\": \"line1\\nline2\"}")
 last_body | grep -q '"@type":"MessageCard"' || fail "teams envelope: $(last_body)"
 last_body | grep -q '"summary":"line1"' || fail "teams summary: $(last_body)"
+last_body | grep -q '"sections"' && fail "plain text should not grow a card section: $(last_body)"
+
+# teams card: the Office 365 shape, with the build result driving the colour bar
+dir=$(post "{\"provider\": \"teams\", \"webhookUrl\": \"http://127.0.0.1:$port/hook\", \"text\": \"3 tests, 1 failed\", \"title\": \"acme/api #42\", \"facts\": \"job=acme/api,branch=main,duration=1m 12s\", \"status\": \"failure\"}")
+last_body | grep -q '"themeColor":"d13438"' || fail "a failed build should be red: $(last_body)"
+last_body | grep -q '"activityTitle":"acme/api #42"' || fail "card title: $(last_body)"
+python3 tools/assert_card.py "$log" || fail "card facts were wrong: $(last_body)"
+
+dir=$(post "{\"provider\": \"teams\", \"webhookUrl\": \"http://127.0.0.1:$port/hook\", \"text\": \"green\", \"status\": \"success\"}")
+last_body | grep -q '"themeColor":"4caf50"' || fail "a successful build should be green: $(last_body)"
+dir=$(post "{\"provider\": \"teams\", \"webhookUrl\": \"http://127.0.0.1:$port/hook\", \"text\": \"wobble\", \"status\": \"unstable\"}")
+last_body | grep -q '"themeColor":"ffb900"' || fail "an unstable build should be amber: $(last_body)"
 
 # dingtalk signs the URL when a secret is given
 dir=$(post "{\"provider\": \"dingtalk\", \"webhookUrl\": \"http://127.0.0.1:$port/robot/send?access_token=abc\", \"secret\": \"SECxyz\", \"text\": \"叮\"}")

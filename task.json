@@ -1,8 +1,8 @@
 {
   "atomCode": "chat-notify",
   "name": "Chat notification",
-  "version": "1.0.1",
-  "description": "Posts one message to Slack, Teams, Google Chat, DingTalk, WeCom, Discord, Mattermost or Rocket.Chat.",
+  "version": "1.1.0",
+  "description": "Sends a build notification to a chat webhook (8 providers, Office 365 cards for teams).",
   "execution": {
     "packagePath": "chat-notify.jar",
     "language": "java",
@@ -63,6 +63,26 @@
       "label": "发送失败就让这一步失败",
       "type": "checkbox",
       "default": "true"
+    },
+    "title": {
+      "label": "卡片标题（teams）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "facts": {
+      "label": "卡片事实表（name=value，逗号分隔）",
+      "type": "textarea",
+      "default": ""
+    },
+    "status": {
+      "label": "构建结果（决定色条：success/unstable/failure）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "themeColor": {
+      "label": "色条（留空则由 status 推）",
+      "type": "vuex-input",
+      "default": ""
     }
   },
   "output": {

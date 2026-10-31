@@ -71,7 +71,13 @@ public class ChatNotifyAtom implements AtomTask {
             return AtomResult.error(ErrorType.USER, 40005, "webhookUrl must be http(s): " + uri.getScheme());
         }
 
-        String payload = payload(provider, text, channel, username, avatarUrl, markdown);
+        String title = context.getParam("title", "");
+        String facts = context.getParam("facts", "");
+        String color = context.getParam("themeColor", "");
+        if (color.isBlank()) {
+            color = statusColor(context.getParam("status", ""));   // a result colour needs no configuration
+        }
+        String payload = payload(provider, text, channel, username, avatarUrl, markdown, title, facts, color);
         context.log("[chat] " + provider + " -> " + redact(uri) + " (" + payload.length() + " bytes)");
 
         HttpResponse<String> response;
@@ -114,16 +120,71 @@ public class ChatNotifyAtom implements AtomTask {
                 .data("payloadBytes", String.valueOf(payload.length()));
     }
 
+
+    /** {@code name=value} pairs, one per comma or line, in the order the caller wrote them. */
+    static java.util.List<Map<String, String>> factList(String facts) {
+        java.util.List<Map<String, String>> list = new java.util.ArrayList<>();
+        for (String part : facts.split("[,\\n]")) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            int split = trimmed.indexOf('=');
+            String name = split < 0 ? trimmed : trimmed.substring(0, split).trim();
+            String value = split < 0 ? "" : trimmed.substring(split + 1).trim();
+            list.add(Map.of("name", name, "value", value));
+        }
+        return list;
+    }
+
+    /** Red for a failure, amber for unstable, green otherwise: the colour is the first thing anyone reads. */
+    static String statusColor(String status) {
+        String lowered = status == null ? "" : status.trim().toLowerCase(java.util.Locale.ROOT);
+        return switch (lowered) {
+            case "failure", "failed", "error", "aborted" -> "d13438";
+            case "unstable" -> "ffb900";
+            case "success", "succeeded", "ok" -> "4caf50";
+            default -> "";
+        };
+    }
+
     /** The wire format each product expects. Kept together so the differences are visible in one place. */
     static String payload(String provider, String text, String channel, String username, String avatar,
                           boolean markdown) {
+        return payload(provider, text, channel, username, avatar, markdown, "", "", "");
+    }
+
+    /**
+     * @param title  card title; empty keeps the older plain message
+     * @param facts  {@code name=value} pairs, comma or newline separated, shown as a card table
+     * @param color  theme colour; empty leaves it to the caller
+     */
+    static String payload(String provider, String text, String channel, String username, String avatar,
+                          boolean markdown, String title, String facts, String color) {
         Map<String, Object> body = new LinkedHashMap<>();
         switch (provider) {
             case "teams" -> {
                 body.put("@type", "MessageCard");
                 body.put("@context", "http://schema.org/extensions");
                 body.put("summary", summary(text));
-                body.put("text", text);
+                if (!color.isBlank()) {
+                    body.put("themeColor", color);
+                }
+                if (!title.isBlank() || !facts.isBlank()) {
+                    // the Office 365 connector card: a titled section with a facts table is the shape people
+                    // actually configure, and it is what the MessageCard schema was extended for
+                    Map<String, Object> section = new LinkedHashMap<>();
+                    if (!title.isBlank()) {
+                        section.put("activityTitle", title);
+                    }
+                    if (!facts.isBlank()) {
+                        section.put("facts", factList(facts));
+                    }
+                    section.put("text", text);
+                    body.put("sections", java.util.List.of(section));
+                } else {
+                    body.put("text", text);
+                }
             }
             case "dingtalk" -> {
                 body.put("msgtype", "text");
