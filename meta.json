@@ -1,0 +1,12 @@
+{
+  "name": "Chat notification",
+  "summary": "Posts one message to Slack, Teams, Google Chat, DingTalk, WeCom, Discord, Mattermost or Rocket.Chat.",
+  "author": "hummerstudio",
+  "license": "MIT",
+  "tags": [
+    "official-port",
+    "notification",
+    "chat"
+  ],
+  "homepage": "https://github.com/hummerstudio/jenkins-atom-chat-notify"
+}

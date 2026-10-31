@@ -1,0 +1,96 @@
+{
+  "atomCode": "chat-notify",
+  "name": "Chat notification",
+  "version": "1.0.0",
+  "description": "Posts one message to Slack, Teams, Google Chat, DingTalk, WeCom, Discord, Mattermost or Rocket.Chat.",
+  "execution": {
+    "packagePath": "chat-notify.jar",
+    "language": "java",
+    "target": "$atom_java_path -cp chat-notify.jar com.jenkinschina.atom.sdk.AtomRunner"
+  },
+  "input": {
+    "provider": {
+      "label": "服务",
+      "type": "vuex-input",
+      "default": "slack"
+    },
+    "webhookUrl": {
+      "label": "Webhook 地址",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "accessToken": {
+      "label": "钉钉 access_token（webhookUrl 留空时使用）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "secret": {
+      "label": "钉钉加签密钥",
+      "type": "password",
+      "default": ""
+    },
+    "text": {
+      "label": "消息内容",
+      "type": "textarea",
+      "default": ""
+    },
+    "channel": {
+      "label": "频道（Slack 可选）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "username": {
+      "label": "显示名（Discord 可选）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "avatarUrl": {
+      "label": "头像地址（Discord 可选）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "markdown": {
+      "label": "企业微信用 markdown 消息",
+      "type": "checkbox",
+      "default": "false"
+    },
+    "timeoutSeconds": {
+      "label": "超时（秒）",
+      "type": "vuex-input",
+      "default": "30"
+    },
+    "failOnError": {
+      "label": "发送失败就让这一步失败",
+      "type": "checkbox",
+      "default": "true"
+    }
+  },
+  "output": {
+    "provider": {
+      "type": "string",
+      "description": "实际使用的服务"
+    },
+    "statusCode": {
+      "type": "string",
+      "description": "HTTP 状态码"
+    },
+    "accepted": {
+      "type": "string",
+      "description": "服务是否接受了消息"
+    },
+    "response": {
+      "type": "string",
+      "description": "响应体摘要"
+    },
+    "payloadBytes": {
+      "type": "string",
+      "description": "报文长度"
+    }
+  },
+  "x-jenkins": {
+    "protocol": "jenkins-1",
+    "requires": {
+      "runner": ">=0.4.0"
+    }
+  }
+}
