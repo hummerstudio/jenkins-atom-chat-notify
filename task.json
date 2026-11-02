@@ -1,7 +1,7 @@
 {
   "atomCode": "chat-notify",
   "name": "Chat notification",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Sends a build notification to a chat webhook (8 providers, Office 365 cards for teams).",
   "execution": {
     "packagePath": "chat-notify.jar",
@@ -82,6 +82,16 @@
     "themeColor": {
       "label": "色条（留空则由 status 推）",
       "type": "vuex-input",
+      "default": ""
+    },
+    "threadKey": {
+      "label": "Google Chat 会话线程（同一条线里回复）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "cardJson": {
+      "label": "Google Chat 卡片 JSON 数组（原样透传为 cards）",
+      "type": "textarea",
       "default": ""
     }
   },

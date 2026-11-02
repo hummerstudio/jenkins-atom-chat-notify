@@ -85,4 +85,35 @@ dir=$(post "{\"provider\": \"slack\", \"webhookUrl\": \"http://127.0.0.1:$port/h
 dir=$(post "{\"provider\": \"nope\", \"webhookUrl\": \"http://127.0.0.1:$port/hook\", \"text\": \"x\"}"); status "$dir" | grep -q error || fail "unknown provider must be refused"
 grep -q "known: slack" "$dir/output.json" || fail "the message should list providers"
 
-echo "smoke ok: 8 envelopes, dingtalk signature, redaction, ok:false, HTTP 500, bad input"
+# the 500 server above is the live one; start a normal one again for the envelope checks
+kill $server 2>/dev/null; wait $server 2>/dev/null
+okport=$((port2 + 2))
+python3 tools/fake_chat.py "$okport" "$log" --body '{"ok":true}' & server=$!
+for _ in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$okport/" && break; sleep 0.1; done
+
+# mattermost: the plugin's own keys, one request per channel
+dir=$(post "{\"provider\": \"mattermost\", \"webhookUrl\": \"http://127.0.0.1:$okport/hook\", \"text\": \"deploy done\", \"channel\": \"town-square\", \"username\": \"jenkins\", \"avatarUrl\": \"https://example.com/bot.png\", \"title\": \"acme/api #42\", \"facts\": \"job=acme/api,result=SUCCESS\", \"status\": \"success\"}")
+status "$dir" | grep -q success || fail "mattermost: $(cat "$dir/output.json")"
+last_body | grep -q '"channel":"town-square"' || fail "mattermost channel: $(last_body)"
+last_body | grep -q '"username":"jenkins"' || fail "mattermost username: $(last_body)"
+last_body | grep -q '"icon_url":"https://example.com/bot.png"' || fail "mattermost icon_url: $(last_body)"
+last_body | grep -q '"color":"4caf50"' || fail "mattermost attachment colour: $(last_body)"
+last_body | grep -q '"mrkdwn_in":\["text","fields"\]' || fail "mattermost mrkdwn_in: $(last_body)"
+
+# ...and "a,b" is two requests, not one channel named "a,b"
+: >"$log"
+dir=$(post "{\"provider\": \"mattermost\", \"webhookUrl\": \"http://127.0.0.1:$okport/hook\", \"text\": \"fan out\", \"channel\": \"alpha,beta\"}")
+[ "$(wc -l <"$log" | tr -d ' ')" = "2" ] || fail "two channels must be two requests: $(cat "$log")"
+[ "$(output "$dir" channelsSent)" = "2" ] || fail "channelsSent: $(cat "$dir/output.json")"
+
+# google-chat: threadKey goes in the body AND becomes a query parameter; cards pass through; no channel field
+: >"$log"
+dir=$(post "{\"provider\": \"google-chat\", \"webhookUrl\": \"http://127.0.0.1:$okport/hook?key=abc&token=t\", \"text\": \"reply here\", \"threadKey\": \"acme-api\", \"cardJson\": \"[{\\\"header\\\":{\\\"title\\\":\\\"build\\\"}}]\"}")
+status "$dir" | grep -q success || fail "google-chat: $(cat "$dir/output.json")"
+last_body | grep -q '"thread":{"threadKey":"acme-api"}' || fail "google-chat thread: $(last_body)"
+last_body | grep -q '"cards":\[{"header"' || fail "google-chat cards: $(last_body)"
+last_body | grep -q '"channel"' && fail "google-chat must not carry a channel field: $(last_body)"
+tail -1 "$log" | python3 -c 'import json,sys; p=json.load(sys.stdin)["path"]; assert "messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD" in p, p' \
+  || fail "the reply option is missing from the URL: $(tail -1 "$log")"
+
+echo "smoke ok: 8 envelopes, mattermost attachments+fan-out, google-chat thread+cards, dingtalk signature, redaction, ok:false, HTTP 500, bad input"

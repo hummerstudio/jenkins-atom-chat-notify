@@ -47,6 +47,8 @@ public class ChatNotifyAtom implements AtomTask {
         String username = context.getParam("username", "");
         String avatarUrl = context.getParam("avatarUrl", "");
         String secret = context.getParam("secret", "");
+        String threadKey = context.getParam("threadKey", "").trim();
+        String cardJson = context.getParam("cardJson", "").trim();
         boolean markdown = context.getBooleanParam("markdown", false);
         boolean failOnError = context.getBooleanParam("failOnError", true);
         int timeoutSeconds = Math.max(5, Math.min(context.getIntParam("timeoutSeconds", 30), 120));
@@ -64,6 +66,11 @@ public class ChatNotifyAtom implements AtomTask {
         URI uri;
         try {
             uri = URI.create(withDingTalkSignature(provider, webhookUrl, secret));
+            // Google Chat answers in a thread only when the request asks for it, and that is a query parameter
+            if ("google-chat".equals(provider) && !threadKey.isEmpty()) {
+                uri = URI.create(uri + (uri.getQuery() == null ? "?" : "&")
+                        + "messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD");
+            }
         } catch (RuntimeException e) {
             return AtomResult.error(ErrorType.USER, 40004, "webhookUrl is not a URL: " + e.getMessage());
         }
@@ -77,8 +84,40 @@ public class ChatNotifyAtom implements AtomTask {
         if (color.isBlank()) {
             color = statusColor(context.getParam("status", ""));   // a result colour needs no configuration
         }
-        String payload = payload(provider, text, channel, username, avatarUrl, markdown, title, facts, color);
-        context.log("[chat] " + provider + " -> " + redact(uri) + " (" + payload.length() + " bytes)");
+
+        // mattermost takes a list of channels (or #channel@user); one request per channel, because a single
+        // request carrying "a,b" makes the server look for a channel literally named "a,b"
+        java.util.List<String> channels = "mattermost".equals(provider) && channel.matches(".*[,;].*")
+                ? java.util.Arrays.stream(channel.split("[,;]+")).map(String::trim).filter(v -> !v.isEmpty()).toList()
+                : java.util.List.of(channel);
+
+        java.util.List<AtomResult> results = new java.util.ArrayList<>();
+        for (String target : channels) {
+            String payload = payload(provider, text, target, username, avatarUrl, markdown, title, facts, color,
+                    threadKey, cardJson);
+            AtomResult result = post(context, provider, uri, payload, timeoutSeconds, failOnError, target);
+            if (!"success".equals(result.getStatus())) {
+                return result;
+            }
+            results.add(result);
+        }
+        if (results.size() == 1) {
+            return results.get(0);
+        }
+        return AtomResult.success()
+                .data("provider", provider)
+                .data("channelsSent", String.valueOf(results.size()))
+                .data("channels", String.join(", ", channels));
+    }
+
+    /**
+     * One POST to one destination. Returns a success carrying the status and the response, or a failure — the caller
+     * only has to know whether the message landed.
+     */
+    private static AtomResult post(AtomContext context, String provider, URI uri, String payload, int timeoutSeconds,
+                                   boolean failOnError, String channel) {
+        context.log("[chat] " + provider + (channel.isEmpty() ? "" : " " + channel) + " -> " + redact(uri)
+                + " (" + payload.length() + " bytes)");
 
         HttpResponse<String> response;
         try {
@@ -99,6 +138,9 @@ public class ChatNotifyAtom implements AtomTask {
         } catch (java.io.IOException e) {
             return AtomResult.error(ErrorType.THIRD_PART, 40007,
                     "posting to " + redact(uri) + " failed: " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return AtomResult.error(ErrorType.ENVIRONMENT, 40009, "interrupted while posting to " + redact(uri));
         }
 
         int status = response.statusCode();
@@ -151,7 +193,7 @@ public class ChatNotifyAtom implements AtomTask {
     /** The wire format each product expects. Kept together so the differences are visible in one place. */
     static String payload(String provider, String text, String channel, String username, String avatar,
                           boolean markdown) {
-        return payload(provider, text, channel, username, avatar, markdown, "", "", "");
+        return payload(provider, text, channel, username, avatar, markdown, "", "", "", "", "");
     }
 
     /**
@@ -160,7 +202,8 @@ public class ChatNotifyAtom implements AtomTask {
      * @param color  theme colour; empty leaves it to the caller
      */
     static String payload(String provider, String text, String channel, String username, String avatar,
-                          boolean markdown, String title, String facts, String color) {
+                          boolean markdown, String title, String facts, String color, String threadKey,
+                          String cardJson) {
         Map<String, Object> body = new LinkedHashMap<>();
         switch (provider) {
             case "teams" -> {
@@ -198,6 +241,49 @@ public class ChatNotifyAtom implements AtomTask {
                     body.put("msgtype", "text");
                     body.put("text", Map.of("content", text));
                 }
+            }
+            case "mattermost" -> {
+                // StandardMattermostService sends these keys; attachments carry the colour bar and the facts table,
+                // with mrkdwn_in so the text inside the attachment is rendered as markdown
+                body.put("text", text);
+                if (!channel.isEmpty()) {
+                    body.put("channel", channel);
+                }
+                if (!username.isEmpty()) {
+                    body.put("username", username);
+                }
+                if (!avatar.isEmpty()) {
+                    body.put("icon_url", avatar);
+                }
+                if (!color.isBlank() || !title.isBlank() || !facts.isBlank()) {
+                    Map<String, Object> attachment = new LinkedHashMap<>();
+                    if (!color.isBlank()) {
+                        attachment.put("color", color);
+                    }
+                    if (!title.isBlank()) {
+                        attachment.put("title", title);
+                    }
+                    if (!facts.isBlank()) {
+                        attachment.put("fields", factList(facts));
+                    }
+                    attachment.put("mrkdwn_in", java.util.List.of("text", "fields"));
+                    body.put("attachments", java.util.List.of(attachment));
+                }
+            }
+            case "google-chat" -> {
+                body.put("text", text);
+                if (!threadKey.isBlank()) {
+                    body.put("thread", Map.of("threadKey", threadKey));
+                }
+                if (!cardJson.isBlank()) {
+                    try {
+                        body.put("cards", Json.parse(cardJson));
+                    } catch (RuntimeException e) {
+                        throw new IllegalArgumentException("cardJson is not a JSON array: " + e.getMessage());
+                    }
+                }
+                // deliberately no channel: Google Chat routes by webhook URL and ignores the field, so writing it
+                // would produce a "sent" that did nothing
             }
             case "discord" -> {
                 body.put("content", text);
