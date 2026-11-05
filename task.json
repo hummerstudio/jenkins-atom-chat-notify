@@ -1,7 +1,7 @@
 {
   "atomCode": "chat-notify",
   "name": "Chat notification",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Sends a build notification to a chat webhook (8 providers, Office 365 cards for teams).",
   "execution": {
     "packagePath": "chat-notify.jar",
@@ -22,12 +22,30 @@
     "accessToken": {
       "label": "钉钉 access_token（webhookUrl 留空时使用）",
       "type": "vuex-input",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "dingtalk"
+          }
+        ]
+      }
     },
     "secret": {
       "label": "钉钉加签密钥",
       "type": "password",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "dingtalk"
+          }
+        ]
+      }
     },
     "text": {
       "label": "消息内容",
@@ -37,22 +55,74 @@
     "channel": {
       "label": "频道（Slack 可选）",
       "type": "vuex-input",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "slack"
+          },
+          {
+            "key": "provider",
+            "value": "mattermost"
+          },
+          {
+            "key": "provider",
+            "value": "rocketchat"
+          }
+        ]
+      }
     },
     "username": {
       "label": "显示名（Discord 可选）",
       "type": "vuex-input",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "discord"
+          },
+          {
+            "key": "provider",
+            "value": "mattermost"
+          },
+          {
+            "key": "provider",
+            "value": "rocketchat"
+          }
+        ]
+      }
     },
     "avatarUrl": {
       "label": "头像地址（Discord 可选）",
       "type": "vuex-input",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "discord"
+          }
+        ]
+      }
     },
     "markdown": {
       "label": "企业微信用 markdown 消息",
       "type": "checkbox",
-      "default": "false"
+      "default": "false",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "wecom"
+          }
+        ]
+      }
     },
     "timeoutSeconds": {
       "label": "超时（秒）",
@@ -67,32 +137,86 @@
     "title": {
       "label": "卡片标题（teams）",
       "type": "vuex-input",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "teams"
+          }
+        ]
+      }
     },
     "facts": {
       "label": "卡片事实表（name=value，逗号分隔）",
       "type": "textarea",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "teams"
+          }
+        ]
+      }
     },
     "status": {
       "label": "构建结果（决定色条：success/unstable/failure）",
       "type": "vuex-input",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "teams"
+          }
+        ]
+      }
     },
     "themeColor": {
       "label": "色条（留空则由 status 推）",
       "type": "vuex-input",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "teams"
+          }
+        ]
+      }
     },
     "threadKey": {
       "label": "Google Chat 会话线程（同一条线里回复）",
       "type": "vuex-input",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "google-chat"
+          }
+        ]
+      }
     },
     "cardJson": {
       "label": "Google Chat 卡片 JSON 数组（原样透传为 cards）",
       "type": "textarea",
-      "default": ""
+      "default": "",
+      "rely": {
+        "operation": "OR",
+        "expression": [
+          {
+            "key": "provider",
+            "value": "google-chat"
+          }
+        ]
+      }
     }
   },
   "output": {
